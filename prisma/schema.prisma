@@ -146,6 +146,9 @@ model Lesson {
   videoThumbnailUrl     String?
   chartUrl              String?
   transcriptText        String?
+  taskVisualType        String?   // "bar_chart" | "line_chart" | "pie_chart" | "process_diagram" | "map" | "table"
+  taskChartData         Json?     // dinamik grafiklar uchun (bar/line/pie)
+  taskImageUrl          String?   // statik rasm/SVG uchun (process diagram, map)
 
   prerequisite  Lesson?       @relation("LessonPrerequisite", fields: [prerequisiteLessonId], references: [id])
   dependents    Lesson[]      @relation("LessonPrerequisite")

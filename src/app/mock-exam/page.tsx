@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Headphones, BookOpen, PenTool, Mic, Clock, Info } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Headphones, BookOpen, PenTool, Mic, Clock, Info, LogIn } from "lucide-react";
+import Link from "next/link";
 
 export default function MockExamPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [starting, setStarting] = useState(false);
 
   const handleStart = async () => {
@@ -13,8 +16,18 @@ export default function MockExamPage() {
     try {
       const res = await fetch("/api/mock-exam", { method: "POST" });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Xatolik yuz berdi");
       if (data.exam) router.push(`/mock-exam/exam/${data.exam.id}`);
-    } catch { setStarting(false); }
+      else throw new Error("Exam yaratilmadi");
+    } catch (err: any) {
+      if (err.message?.includes("qaytadan tizimga kiring") || err.message?.includes("Unauthorized")) {
+        alert("Sessiya muddati tugagan. Iltimos, qaytadan tizimga kiring.");
+        router.push("/login");
+      } else {
+        alert(err.message || "Xatolik yuz berdi");
+      }
+      setStarting(false);
+    }
   };
 
   return (
@@ -138,13 +151,23 @@ export default function MockExamPage() {
           </ul>
         </div>
 
-        <button
-          onClick={handleStart}
-          disabled={starting}
-          className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-violet-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
-        >
-          {starting ? "Tayyorlanmoqda..." : "Mock Examni boshlash"}
-        </button>
+        {session ? (
+          <button
+            onClick={handleStart}
+            disabled={starting}
+            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-violet-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+          >
+            {starting ? "Tayyorlanmoqda..." : "Mock Examni boshlash"}
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            className="flex items-center justify-center gap-2 w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-violet-700 transition-all shadow-lg"
+          >
+            <LogIn className="w-5 h-5" />
+            Kirish
+          </Link>
+        )}
       </div>
     </div>
   );

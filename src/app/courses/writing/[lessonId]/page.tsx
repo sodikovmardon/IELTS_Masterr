@@ -16,6 +16,7 @@ import {
   Speech, Grip, BookCheck, WholeWord, PencilRuler, Flame
 } from "lucide-react";
 import VideoPlayer from "@/components/VideoPlayer";
+import TaskVisual from "@/components/visuals/TaskVisual";
 
 interface LessonProgress {
   completed: boolean;
@@ -45,6 +46,9 @@ interface Lesson {
   videoThumbnailUrl: string | null;
   chartUrl: string | null;
   transcriptText: string | null;
+  taskVisualType: string | null;
+  taskChartData: any;
+  taskImageUrl: string | null;
   progresses: LessonProgress[];
 }
 
@@ -344,6 +348,34 @@ export default function WritingLessonPage() {
   const lessonType = lesson ? getLessonType(lesson.title) : "general";
 
   const modelAnswer = questions[0]?.explanation || "";
+
+  const taskVisualProps = useMemo(() => {
+    if (!lesson || !lesson.taskVisualType) return null;
+    let chartData = null;
+    if (lesson.taskChartData) {
+      try {
+        chartData = typeof lesson.taskChartData === 'string' ? JSON.parse(lesson.taskChartData) : lesson.taskChartData;
+      } catch {}
+    }
+    const processData = lesson.taskVisualType === 'process_diagram' ? {
+      title: 'Cement ishlab chiqarish jarayoni',
+      steps: [
+        { label: 'Xom ashyo yig\'ish', description: 'Ohaktosh va gil' },
+        { label: 'Maydalash', description: 'Krusherda' },
+        { label: 'Aralashtirish', description: 'Proportsiya bo\'yicha' },
+        { label: 'Qizdirish', description: '1800°C da aylanma pech' },
+        { label: 'Sovutish va maydalash', description: 'Klinker' },
+        { label: 'Qadoqlash', description: '50kg sumkalarda' },
+      ],
+    } : undefined;
+    return {
+      visualType: lesson.taskVisualType,
+      chartData,
+      imageUrl: lesson.taskImageUrl,
+      processData,
+      caption: 'Yuqoridagi ma\'lumotlarni umumlashtiring va solishtiring. Kamida 150 so\'z yozing.',
+    };
+  }, [lesson]);
 
   useEffect(() => {
     const p = new URLSearchParams({ category: "writing" });
@@ -648,14 +680,9 @@ export default function WritingLessonPage() {
             />
           )}
           {renderContent(lesson.theoryContent)}
-          {lesson.chartUrl && (
-            <div className="mt-6 bg-white rounded-xl border border-gray-200 p-4">
-              <img
-                src={lesson.chartUrl}
-                alt="Writing task chart"
-                className="w-full max-w-2xl mx-auto rounded-lg"
-                style={{ aspectRatio: "16/10", objectFit: "contain" }}
-              />
+          {taskVisualProps && (
+            <div className="mt-6">
+              <TaskVisual data={taskVisualProps} />
             </div>
           )}
           {writingTopic && (
@@ -905,14 +932,9 @@ export default function WritingLessonPage() {
                   <FileText className="w-4 h-4 text-indigo-600" />
                   <h3 className="font-semibold text-indigo-800 text-sm">Writing Topic</h3>
                 </div>
-                {lesson.chartUrl && (
-                  <div className="mb-4 bg-white rounded-lg border border-indigo-100 p-3">
-                    <img
-                      src={lesson.chartUrl}
-                      alt="Writing task chart"
-                      className="w-full max-w-xl mx-auto rounded"
-                      style={{ aspectRatio: "16/10", objectFit: "contain" }}
-                    />
+                {taskVisualProps && (
+                  <div className="mb-4">
+                    <TaskVisual data={taskVisualProps} />
                   </div>
                 )}
                 <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{writingTopic}</p>
