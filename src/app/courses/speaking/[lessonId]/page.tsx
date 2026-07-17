@@ -633,7 +633,7 @@ export default function SpeakingLessonPage() {
                         if (audioPlaying) {
                           stopAudio();
                         } else {
-                          speakText(cueCard);
+                          speakText(cueCard || "");
                         }
                       }}
                       className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-600/20 transition-colors"

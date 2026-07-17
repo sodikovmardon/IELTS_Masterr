@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Group, Panel, Separator } from "react-resizable-panels";
+const PanelGroup = Group as any;
 import {
   ArrowLeft,
   Clock,
@@ -749,7 +750,7 @@ export default function ReadingLessonPage() {
 
               {/* Desktop: split panels */}
               <div className="hidden md:flex h-full">
-                <Group orientation="horizontal" autoSaveId="reading-split">
+                <PanelGroup orientation="horizontal" autoSaveId="reading-split">
                   <Panel id="passage-panel" defaultSize={55} minSize={30}>
                     <div
                       className="p-6 h-full"
@@ -799,7 +800,7 @@ export default function ReadingLessonPage() {
                       </div>
                     </div>
                   </Panel>
-                </Group>
+                </PanelGroup>
               </div>
 
               {/* Mobile: tab content */}

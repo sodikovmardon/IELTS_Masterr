@@ -27,7 +27,7 @@ const COLORS = [
   { id: "red", bg: "#fecaca", label: "Tushunmadim" },
 ];
 
-export default function TextHighlighter({ lessonId, text, children }: Props) {
+export default function TextHighlighter({ lessonId, text, onWordClick }: Props) {
   const { data: session } = useSession();
   const containerRef = useRef<HTMLDivElement>(null);
   const [highlights, setHighlights] = useState<Highlight[]>([]);

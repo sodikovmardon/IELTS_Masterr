@@ -38,6 +38,9 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           level: user.level,
+          subscriptionPlan: user.subscriptionPlan,
+          subscriptionStatus: user.subscriptionStatus,
+          subscriptionExpiresAt: user.subscriptionExpiresAt,
         };
       },
     }),
@@ -47,6 +50,11 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.level = (user as any).level;
+        token.subscriptionPlan = (user as any).subscriptionPlan;
+        token.subscriptionStatus = (user as any).subscriptionStatus;
+        token.subscriptionExpiresAt = (user as any).subscriptionExpiresAt
+          ? (user as any).subscriptionExpiresAt.toISOString?.() || (user as any).subscriptionExpiresAt
+          : null;
       }
       return token;
     },
@@ -54,6 +62,9 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).level = token.level;
+        (session.user as any).subscriptionPlan = token.subscriptionPlan;
+        (session.user as any).subscriptionStatus = token.subscriptionStatus;
+        (session.user as any).subscriptionExpiresAt = token.subscriptionExpiresAt;
       }
       return session;
     },

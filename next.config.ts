@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   allowedDevOrigins: ['dimmed-depletion-gravy.ngrok-free.dev', '*.ngrok-free.app', '*.ngrok.io'],
-  devIndicators: {
-    appIsrStatus: false,
-    buildActivity: false,
-  },
 };
 
 export default nextConfig;

@@ -20,6 +20,10 @@ model User {
   lastActiveDate DateTime?
   createdAt     DateTime @default(now())
 
+  subscriptionPlan   String?  // "free" | "monthly" | "yearly"
+  subscriptionStatus String   @default("free") // "free" | "active" | "expired" | "cancelled"
+  subscriptionExpiresAt DateTime?
+
   testResults      TestResult[]
   studyPlans       StudyPlan[]
   practiceAttempts PracticeAttempt[]
@@ -37,6 +41,20 @@ model User {
   mockExams           MockExam[]
   topicMasteries      TopicMastery[]
   videoProgress        VideoProgress[]
+  payments            Payment[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String   // "monthly" | "yearly"
+  amount    Int
+  currency  String   @default("UZS")
+  status    String   // "pending" | "success" | "failed" | "refunded"
+  provider  String?  // "payme" | "click" — keyinchalik to'ldiriladi
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model TestResult {

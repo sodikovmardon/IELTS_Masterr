@@ -21,8 +21,24 @@ export async function GET() {
       level: true,
       targetScore: true,
       streakCount: true,
+      subscriptionPlan: true,
+      subscriptionStatus: true,
+      subscriptionExpiresAt: true,
       createdAt: true,
       lessonProgresses: { select: { completed: true } },
+      mockExams: {
+        orderBy: { completedAt: "desc" },
+        take: 3,
+        select: {
+          id: true,
+          overallBand: true,
+          completedAt: true,
+          listeningBand: true,
+          readingBand: true,
+          writingBand: true,
+          speakingBand: true,
+        },
+      },
     },
   });
 
@@ -45,6 +61,18 @@ export async function GET() {
     completedLessons: user.lessonProgresses.filter((p) => p.completed).length,
     totalHours,
     createdAt: user.createdAt.toISOString(),
+    subscriptionPlan: user.subscriptionPlan,
+    subscriptionStatus: user.subscriptionStatus,
+    subscriptionExpiresAt: user.subscriptionExpiresAt?.toISOString() || null,
+    mockExams: user.mockExams.map((m) => ({
+      id: m.id,
+      overallBand: m.overallBand,
+      completedAt: m.completedAt?.toISOString(),
+      listeningBand: m.listeningBand,
+      readingBand: m.readingBand,
+      writingBand: m.writingBand,
+      speakingBand: m.speakingBand,
+    })),
   });
 }
 
