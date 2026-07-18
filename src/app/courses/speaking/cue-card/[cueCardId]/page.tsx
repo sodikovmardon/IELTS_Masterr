@@ -367,7 +367,7 @@ export default function CueCardPracticePage() {
               <div className="text-center pt-10 pb-8">
                 <div className="text-5xl mb-3">⏰</div>
                 <h2 className="font-['Playfair_Display',serif] text-2xl font-bold text-white mb-2">Vaqt tugadi!</h2>
-                <p className="text-sm text-white/40 mb-6">Agar yozib ulgurmagan bo'lsangiz, quyidagi tugma orqali yozishingiz mumkin.</p>
+                <p className="text-sm text-white/40 mb-6">Vaqt tugadi. Yozib ulgurgan bo'lsangiz, natijani ko'rishingiz mumkin.</p>
 
                 <div className="flex gap-3 justify-center">
                   <button
