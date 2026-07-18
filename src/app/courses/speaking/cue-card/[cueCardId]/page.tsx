@@ -11,7 +11,6 @@ import {
   Mic,
   Timer,
   Volume2,
-  Send,
   Loader2,
   Award,
   BarChart3,
@@ -122,11 +121,8 @@ export default function CueCardPracticePage() {
   const [card, setCard] = useState<CueCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [stage, setStage] = useState<"prep" | "speak" | "done" | "feedback">("prep");
-  const [responseText, setResponseText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
-  const [hasMic, setHasMic] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
   const prepTimer = useTimer(60, stage === "prep");
@@ -144,14 +140,6 @@ export default function CueCardPracticePage() {
       })
       .finally(() => setLoading(false));
   }, [cueCardId]);
-
-  useEffect(() => {
-    if (navigator.mediaDevices?.enumerateDevices) {
-      navigator.mediaDevices.enumerateDevices().then((devices) => {
-        setHasMic(devices.filter((d) => d.kind === "audioinput").length > 0);
-      }).catch(() => setHasMic(false));
-    }
-  }, []);
 
   useEffect(() => {
     if (stage === "prep" && prepTimer.secondsLeft === 0 && prepTimer.secondsLeft !== undefined) {
@@ -190,32 +178,10 @@ export default function CueCardPracticePage() {
     try { return JSON.parse(card.cuePoints); } catch { return []; }
   }, [card]);
 
-  const wordCount = useMemo(() => responseText.split(/\s+/).filter(Boolean).length, [responseText]);
-
-  const handleAudioSave = useCallback((_audioBlob: Blob, _duration: number) => {}, []);
-  const handleTranscription = useCallback((text: string) => {
-    setResponseText((prev) => prev + text + " ");
+  const handleEvaluationComplete = useCallback((data: EvaluationResult) => {
+    setEvaluation(data);
+    setStage("feedback");
   }, []);
-
-  const handleSubmit = async () => {
-    if (!responseText.trim()) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/speaking/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: `CUE_CARD_PRACTICE: ${card?.title || ""}\n\n${responseText}`,
-          lessonId: cueCardId,
-          questions: JSON.stringify(cuePoints.map((p) => ({ question: p, explanation: "" }))),
-        }),
-      });
-      const data = await res.json();
-      setEvaluation(data);
-      setStage("feedback");
-    } catch {}
-    setSubmitting(false);
-  };
 
   const criteriaScores = useMemo((): Record<string, number> => {
     if (!evaluation) return { fluencyCoherence: 0, lexicalResource: 0, grammaticalRange: 0, pronunciation: 0 };
@@ -370,28 +336,13 @@ export default function CueCardPracticePage() {
                 />
               </div>
 
-              {hasMic ? (
-                <div className="mb-6">
-                  <VoiceRecorder onSave={handleAudioSave} onTranscription={handleTranscription} language="en-US" />
-                </div>
-              ) : (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                    <p className="text-sm text-amber-300">Mikrofon topilmadi. Iltimos, javobingizni matn shaklida yozing.</p>
-                  </div>
-                </div>
-              )}
-
-              <textarea
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                placeholder="Javobingizni yozing..."
-                className="w-full h-40 p-5 bg-white/5 border border-white/10 rounded-xl text-white/80 placeholder:text-white/20 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 resize-y text-sm"
-              />
-
-              <div className="flex items-center justify-between mt-3 mb-6">
-                <span className="text-xs text-white/30">So'zlar: {wordCount}</span>
+              <div className="mb-6">
+                <VoiceRecorder
+                  lessonId={`cue-card-${cueCardId}`}
+                  questions={JSON.stringify(cuePoints.map((p) => ({ question: p, explanation: "" })))}
+                  title={card?.title}
+                  onComplete={handleEvaluationComplete}
+                />
               </div>
 
               <div className="flex gap-3">
@@ -407,14 +358,6 @@ export default function CueCardPracticePage() {
                 >
                   Tayyor
                 </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting || !responseText.trim()}
-                  className="flex-1 bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-600 hover:to-violet-600 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-                >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                  Baholash
-                </button>
               </div>
             </motion.div>
           )}
@@ -424,29 +367,14 @@ export default function CueCardPracticePage() {
               <div className="text-center pt-10 pb-8">
                 <div className="text-5xl mb-3">⏰</div>
                 <h2 className="font-['Playfair_Display',serif] text-2xl font-bold text-white mb-2">Vaqt tugadi!</h2>
-                <p className="text-sm text-white/40 mb-6">Javobingizni tekshirib, baholashga yuboring.</p>
-
-                <textarea
-                  value={responseText}
-                  onChange={(e) => setResponseText(e.target.value)}
-                  placeholder="Javobingizni yozing..."
-                  className="w-full h-40 p-5 bg-white/5 border border-white/10 rounded-xl text-white/80 placeholder:text-white/20 focus:border-indigo-500/50 text-sm mb-4"
-                />
+                <p className="text-sm text-white/40 mb-6">Agar yozib ulgurmagan bo'lsangiz, quyidagi tugma orqali yozishingiz mumkin.</p>
 
                 <div className="flex gap-3 justify-center">
                   <button
                     onClick={() => setStage("speak")}
                     className="px-6 py-3 border border-white/20 text-white/60 rounded-xl font-medium hover:bg-white/5 transition-colors text-sm"
                   >
-                    Qayta yozish
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !responseText.trim()}
-                    className="bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-600 hover:to-violet-600 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-                  >
-                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                    Baholash
+                    Ovoz yozishga qaytish
                   </button>
                 </div>
               </div>
@@ -551,7 +479,7 @@ export default function CueCardPracticePage() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => { setStage("prep"); setEvaluation(null); setShowModelAnswer(false); setResponseText(""); }}
+                  onClick={() => { setStage("prep"); setEvaluation(null); setShowModelAnswer(false); }}
                   className="flex-1 border border-white/20 text-white/60 px-6 py-3 rounded-xl font-medium hover:bg-white/5 transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <ChevronLeft className="w-4 h-4" /> Qayta urinish

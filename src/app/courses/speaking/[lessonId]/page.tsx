@@ -24,12 +24,10 @@ import {
   History,
   Eye,
   EyeOff,
-  Send,
   MessageSquare,
   Timer,
   BarChart3,
   Volume2,
-  FileText,
 } from "lucide-react";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VideoPlayer from "@/components/VideoPlayer";
@@ -209,8 +207,6 @@ export default function SpeakingLessonPage() {
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [block, setBlock] = useState<"theory" | "practice" | "feedback">("theory");
-  const [responseText, setResponseText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [bookmarked, setBookmarked] = useState(false);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
@@ -219,7 +215,6 @@ export default function SpeakingLessonPage() {
   const [prepCountdown, setPrepCountdown] = useState(false);
   const [speakCountdown, setSpeakCountdown] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [hasMic, setHasMic] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
   const prepTimer = useTimer(60, prepCountdown);
@@ -251,18 +246,9 @@ export default function SpeakingLessonPage() {
   }, [stopAudio]);
 
   useEffect(() => {
-    if (navigator.mediaDevices?.enumerateDevices) {
-      navigator.mediaDevices.enumerateDevices().then((devices) => {
-        const audioInputs = devices.filter((d) => d.kind === "audioinput");
-        setHasMic(audioInputs.length > 0);
-      }).catch(() => setHasMic(false));
-    }
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams({ category: "speaking" });
-    if (session?.user?.id) params.set("userId", session.user.id);
-    fetch(`/api/lessons?${params}`)
+    const searchParams = new URLSearchParams({ category: "speaking" });
+    if (session?.user?.id) searchParams.set("userId", session.user.id);
+    fetch(`/api/lessons?${searchParams}`)
       .then((r) => r.json())
       .then((res) => {
         if (res.lessons) {
@@ -281,7 +267,6 @@ export default function SpeakingLessonPage() {
 
   useEffect(() => {
     if (block === "theory") {
-      setResponseText("");
       setEvaluation(null);
       setShowModelAnswer(false);
       setCurrentQuestionIndex(0);
@@ -331,10 +316,6 @@ export default function SpeakingLessonPage() {
     return allLessons.every((l) => l.progresses?.[0]?.completed);
   }, [allLessons]);
 
-  const wordCount = useMemo(() => {
-    return responseText.split(/\s+/).filter(Boolean).length;
-  }, [responseText]);
-
   const handleBookmark = async () => {
     if (!session?.user?.id || !lesson) return;
     try {
@@ -369,52 +350,27 @@ export default function SpeakingLessonPage() {
     };
   }, []);
 
-  const handleAudioSave = useCallback((_audioBlob: Blob, _duration: number) => {
-  }, []);
-
-  const handleTranscription = useCallback((text: string) => {
-    setResponseText((prev) => prev + text + " ");
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!responseText.trim()) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/speaking/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: responseText,
-          lessonId,
-          questions: JSON.stringify(questions),
-        }),
-      });
-      const data = await res.json();
-      setEvaluation(data);
-      setBlock("feedback");
-
-      if (session?.user?.id) {
-        try {
-          await fetch("/api/lessons", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lessonId: lesson!.id,
-              userId: session.user.id,
-              score: Math.round(data.overallBand * 2),
-              maxScore: 18,
-              completed: true,
-              answers: JSON.stringify({ text: responseText, evaluation: data }),
-              attempts: (lesson!.progresses?.[0]?.attempts || 0) + 1,
-            }),
-          });
-        } catch {}
-      }
-    } catch {
-      setEvaluation(null);
+  const handleEvaluationComplete = useCallback(async (data: EvaluationResult) => {
+    setEvaluation(data);
+    setBlock("feedback");
+    if (session?.user?.id && lesson) {
+      try {
+        await fetch("/api/lessons", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lessonId: lesson.id,
+            userId: session.user.id,
+            score: Math.round(data.overallBand * 2),
+            maxScore: 18,
+            completed: true,
+            answers: JSON.stringify({ evaluation: data }),
+            attempts: (lesson.progresses?.[0]?.attempts || 0) + 1,
+          }),
+        });
+      } catch {}
     }
-    setSubmitting(false);
-  };
+  }, [session, lesson]);
 
   const criteriaScores = useMemo((): Record<string, number> => {
     if (!evaluation) return { fluencyCoherence: 0, lexicalResource: 0, grammaticalRange: 0, pronunciation: 0 };
@@ -626,7 +582,7 @@ export default function SpeakingLessonPage() {
             {isPart2 && (
               <div className="glass-card bg-indigo-50/90 backdrop-blur-sm border border-indigo-200 rounded-2xl shadow-macos p-5 mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <FileText className="w-5 h-5 text-indigo-600" />
+                  <MessageSquare className="w-5 h-5 text-indigo-600" />
                   <h3 className="font-semibold text-indigo-800">Cue Card</h3>
                     <button
                       onClick={() => {
@@ -716,36 +672,13 @@ export default function SpeakingLessonPage() {
               </div>
             )}
 
-            {hasMic ? (
-              <div className="mb-6">
-                <VoiceRecorder onSave={handleAudioSave} onTranscription={handleTranscription} language="en-US" />
-              </div>
-            ) : (
-              <div className="glass-card bg-amber-50/90 backdrop-blur-sm border border-amber-200 rounded-2xl shadow-macos p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-800 mb-1">Mikrofon topilmadi</p>
-                    <p className="text-sm text-amber-700">Iltimos, javobingizni matn shaklida yozing.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="mb-6">
-              <textarea
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                placeholder="Javobingizni yozing..."
-                className="w-full h-48 p-5 bg-white rounded-xl input-macos border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary resize-y text-gray-800 leading-relaxed text-sm"
+              <VoiceRecorder
+                lessonId={lessonId}
+                questions={JSON.stringify(questions)}
+                title={lesson.title}
+                onComplete={handleEvaluationComplete}
               />
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">So'zlar:</span>
-                <span className="font-bold text-gray-700">{wordCount}</span>
-              </div>
             </div>
 
             <div className="flex gap-3">
@@ -758,18 +691,6 @@ export default function SpeakingLessonPage() {
                 className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition-colors text-sm btn-macos"
               >
                 Orqaga
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !responseText.trim()}
-                className="flex-1 sm:flex-none bg-gradient-to-r from-green-500 to-emerald-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-              >
-                {submitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-                Yuborish
               </button>
             </div>
           </motion.div>
@@ -894,7 +815,7 @@ export default function SpeakingLessonPage() {
                 }}
                 className="flex-1 border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 btn-macos"
               >
-                <ChevronLeft className="w-4 h-4" /> Qayta yozish
+                <ChevronLeft className="w-4 h-4" /> Qayta urinish
               </button>
 
               {nextLesson && (
