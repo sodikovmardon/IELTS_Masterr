@@ -107,10 +107,11 @@ export async function POST(req: Request) {
       if (answers[index] === q.correctAnswer) score++;
     });
 
+    const act = await prisma.practiceActivity.findFirst({ where: { type: "mini_reading" } });
     const attempt = await prisma.practiceAttempt.create({
       data: {
         userId,
-        practiceId: practiceId || passageId,
+        activityId: act?.id || "mini-reading-1",
         score,
         maxScore: passage.questions.length,
       },

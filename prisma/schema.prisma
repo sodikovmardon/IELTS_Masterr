@@ -82,15 +82,34 @@ model StudyPlan {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model PracticeAttempt {
-  id         String   @id @default(cuid())
-  userId     String
-  practiceId String
-  score      Int
-  maxScore   Int       @default(0)
-  date       DateTime  @default(now())
+model PracticeActivity {
+  id           String   @id @default(cuid())
+  type         String   // "speed_vocab", "grammar_sprint", "error_spotting", "word_association", "sentence_builder", "mini_reading", "pronunciation", "listening_snippet", "mixed_review", "daily_challenge"
+  title        String
+  icon         String   @default("📝")
+  category     String   @default("quick") // "quick", "daily_challenge", "recommended"
+  data         String   @default("{}")    // JSON: questions, options, audioUrls, etc.
+  estimatedMin Int      @default(3)
+  isDaily      Boolean  @default(false)
+  dailyDate    String?  // "YYYY-MM-DD" format
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts PracticeAttempt[]
+}
+
+model PracticeAttempt {
+  id           String   @id @default(cuid())
+  userId       String
+  activityId   String
+  score        Int
+  maxScore     Int       @default(0)
+  timeSpentSec Int       @default(0)
+  comboCount   Int       @default(0)
+  isHighScore  Boolean   @default(false)
+  attemptData  String    @default("{}") // JSON: answers, mistakes, etc.
+  attemptedAt  DateTime  @default(now())
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity PracticeActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 }
 
 model WordHistory {

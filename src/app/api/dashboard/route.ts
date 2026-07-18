@@ -33,7 +33,7 @@ export async function GET() {
 
     const practiceAttempts = await prisma.practiceAttempt.findMany({
       where: { userId },
-      orderBy: { date: "desc" },
+      orderBy: { attemptedAt: "desc" },
     });
 
     const flashcards = await prisma.flashcard.findMany({

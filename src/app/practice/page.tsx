@@ -1,284 +1,215 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { BookOpen, ChevronRight, Volume2, Loader2 } from "lucide-react";
-import SmartDictionary from "@/components/SmartDictionary";
+import { useRouter } from "next/navigation";
+import {
+  Zap, Flame, Target, Clock, Trophy,
+  Sparkles, TrendingUp, BookOpen,
+} from "lucide-react";
+import PracticeEngine from "@/components/practice/PracticeEngine";
 
-interface Passage {
+interface PracticeActivity {
   id: string;
+  type: string;
   title: string;
-  content: string;
-  questions: {
-    question: string;
-    options: string[];
-    correctAnswer: number;
-  }[];
-  vocabulary: { word: string; meaning: string }[];
+  icon: string;
+  category: string;
+  data: string;
+  estimatedMin: number;
+  isDaily: boolean;
+  dailyDate: string | null;
 }
+
+const categoryMeta: Record<string, { label: string; icon: any; color: string }> = {
+  quick: { label: "Tezkor mashqlar", icon: Zap, color: "from-amber-400 to-orange-500" },
+  daily_challenge: { label: "Kunlik Challenge", icon: Flame, color: "from-red-400 to-rose-500" },
+  recommended: { label: "Sizga tavsiya etilgan", icon: Sparkles, color: "from-indigo-400 to-purple-500" },
+};
+
+const activityMeta: Record<string, { gradient: string }> = {
+  speed_vocab: { gradient: "from-yellow-400 to-orange-500" },
+  grammar_sprint: { gradient: "from-emerald-400 to-teal-500" },
+  error_spotting: { gradient: "from-red-400 to-pink-500" },
+  word_association: { gradient: "from-blue-400 to-indigo-500" },
+  sentence_builder: { gradient: "from-purple-400 to-violet-500" },
+  mini_reading: { gradient: "from-cyan-400 to-blue-500" },
+  pronunciation: { gradient: "from-pink-400 to-rose-500" },
+  listening_snippet: { gradient: "from-teal-400 to-cyan-500" },
+  mixed_review: { gradient: "from-indigo-400 to-purple-500" },
+  daily_challenge: { gradient: "from-red-400 to-rose-500" },
+};
 
 export default function PracticePage() {
   const { data: session } = useSession();
-  const [passages, setPassages] = useState<Passage[]>([]);
-  const [activePassage, setActivePassage] = useState<Passage | null>(null);
-  const [answers, setAnswers] = useState<number[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [result, setResult] = useState<{
-    score: number;
-    total: number;
-  } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [dictWord, setDictWord] = useState<string | null>(null);
-  const [selectedText, setSelectedText] = useState("");
+  const router = useRouter();
+  const [activities, setActivities] = useState<PracticeActivity[]>([]);
+  const [highScores, setHighScores] = useState<Record<string, { score: number; comboCount: number }>>({});
+  const [todayAttemptCount, setTodayAttemptCount] = useState(0);
+  const [todayStreak, setTodayStreak] = useState(0);
+  const [activeActivity, setActiveActivity] = useState<PracticeActivity | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/practice")
-      .then((r) => r.json())
-      .then((data) => setPassages(data.passages));
+    fetchActivities();
   }, []);
 
-  const handleWordClick = (word: string) => {
-    const cleanWord = word.replace(/[^a-zA-Z-]/g, "").toLowerCase();
-    if (cleanWord && cleanWord.length > 1) {
-      setDictWord(cleanWord);
-      setSelectedText(cleanWord);
+  const fetchActivities = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/practice/activities");
+      const data = await res.json();
+      setActivities(data.activities || []);
+      setHighScores(data.highScores || {});
+      setTodayAttemptCount(data.todayAttemptCount || 0);
+      setTodayStreak(data.todayStreak || 0);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStartPassage = (passage: Passage) => {
-    setActivePassage(passage);
-    setAnswers([]);
-    setSubmitted(false);
-    setResult(null);
-  };
+  const dailyGoal = 3;
+  const dailyProgress = Math.min(todayAttemptCount / dailyGoal, 1);
 
-  const handleAnswer = (qIndex: number, answerIndex: number) => {
-    const newAnswers = [...answers];
-    newAnswers[qIndex] = answerIndex;
-    setAnswers(newAnswers);
-  };
+  const grouped = activities.reduce((acc, a) => {
+    const key = a.isDaily ? "daily_challenge" : a.category;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(a);
+    return acc;
+  }, {} as Record<string, PracticeActivity[]>);
 
-  const handleSubmit = async () => {
-    if (!activePassage) return;
-    setSubmitted(true);
-
-    let score = 0;
-    activePassage.questions.forEach((q, i) => {
-      if (answers[i] === q.correctAnswer) score++;
-    });
-    setResult({ score, total: activePassage.questions.length });
-
-    if (session) {
-      setSaving(true);
-      try {
-        await fetch("/api/practice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            practiceId: activePassage.id,
-            passageId: activePassage.id,
-            answers,
-          }),
-        });
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setSaving(false);
-      }
-    }
-
-    for (const word of activePassage.vocabulary) {
-      handleWordClick(word.word);
-    }
-  };
-
-  if (activePassage && !submitted) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <button
-          onClick={() => setActivePassage(null)}
-          className="text-sm text-gray-600 hover:text-primary mb-4 transition-colors"
-        >
-          ← Matnlar ro'yxatiga qaytish
-        </button>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-6 mb-6"
-        >
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            {activePassage.title}
-          </h2>
-          <div
-            className="text-gray-700 leading-relaxed space-y-2 cursor-default"
-            onClick={(e) => {
-              const sel = window.getSelection();
-              if (sel) {
-                const text = sel.toString().trim().split(" ")[0];
-                if (text) handleWordClick(text);
-              }
-            }}
-          >
-            {activePassage.content.split("\n").map((paragraph, i) => (
-              <p key={i}>{paragraph}</p>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {activePassage.vocabulary.map((v) => (
-              <button
-                key={v.word}
-                onClick={() => handleWordClick(v.word)}
-                className="text-xs px-2 py-1 bg-accent-yellow bg-opacity-40 text-yellow-800 rounded-full hover:bg-opacity-60 transition-colors"
-              >
-                {v.word}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-
-        <div className="space-y-4 mb-6">
-          {activePassage.questions.map((q, qIndex) => (
-            <div
-              key={qIndex}
-              className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-5"
-            >
-              <p className="font-medium text-gray-900 mb-3">
-                {qIndex + 1}. {q.question}
-              </p>
-              <div className="space-y-2">
-                {q.options.map((opt, oIndex) => (
-                  <button
-                    key={oIndex}
-                    onClick={() => handleAnswer(qIndex, oIndex)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all text-sm ${
-                      answers[qIndex] === oIndex
-                        ? "border-primary bg-indigo-50 text-primary"
-                        : "border-gray-200 hover:border-primary/50 text-gray-700"
-                    }`}
-                  >
-                    {String.fromCharCode(65 + oIndex)}. {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={handleSubmit}
-          disabled={answers.length < activePassage.questions.length}
-          className="w-full bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 btn-macos"
-        >
-          {saving ? "Saqlanmoqda..." : "Javoblarni tekshirish"}
-        </button>
-
-        {dictWord && (
-          <SmartDictionary
-            word={dictWord}
-            onClose={() => setDictWord(null)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (activePassage && submitted && result) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos p-8 text-center border border-white/20"
-        >
-          <div className="text-4xl font-bold text-primary mb-2">
-            {result.score}/{result.total}
-          </div>
-          <p className="text-gray-600 mb-2">To'g'ri javoblar</p>
-          <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
-            <div
-              className="bg-accent-mint h-3 rounded-full transition-all"
-              style={{
-                width: `${(result.score / result.total) * 100}%`,
-              }}
-            />
-          </div>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => handleStartPassage(activePassage)}
-              className="px-6 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors btn-macos"
-            >
-              Qayta urinish
-            </button>
-            <button
-              onClick={() => setActivePassage(null)}
-              className="px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors btn-macos"
-            >
-              Boshqa matn
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
+  if (activeActivity) {
+    return <div className="max-w-4xl mx-auto px-4 py-8">
+      <PracticeEngine activity={activeActivity} onBack={() => setActiveActivity(null)} />
+    </div>;
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Interactive Practice
-          </h1>
-          <p className="text-gray-600">
-            Matnlarni o'qing, savollarga javob bering va so'zlarning ma'nosini
-            toping
-          </p>
-        </div>
-
-        <div className="grid gap-6">
-          {passages.map((passage, i) => (
-            <motion.div
-              key={passage.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-6 hover:shadow-macos transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <BookOpen className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold text-gray-900">
-                      {passage.title}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {passage.content.slice(0, 150)}...
-                  </p>
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span>{passage.questions.length} ta savol</span>
-                    <span>{passage.vocabulary.length} ta so'z</span>
-                  </div>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Amaliyot</h1>
+            <p className="text-gray-500 mt-1">Mashq qiling, o'z ustingizda ishlang va natijalaringizni yaxshilang</p>
+          </div>
+          {session && (
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Bugun</div>
+                <div className="flex items-center gap-1 text-lg font-bold text-amber-500">
+                  <Flame className="w-5 h-5" />
+                  {todayStreak} kun
                 </div>
-                <button
-                  onClick={() => handleStartPassage(passage)}
-                  className="flex items-center gap-1 text-primary text-sm font-medium hover:underline whitespace-nowrap"
-                >
-                  Boshlash <ChevronRight className="w-4 h-4" />
-                </button>
               </div>
-            </motion.div>
-          ))}
+            </div>
+          )}
         </div>
-      </motion.div>
 
-      {dictWord && (
-        <SmartDictionary word={dictWord} onClose={() => setDictWord(null)} />
-      )}
+        {/* Daily Goal Progress */}
+        {session && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-6 mb-8"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-primary" />
+                <span className="font-semibold text-gray-900">Bugungi maqsad: {dailyGoal} ta mashq</span>
+              </div>
+              <span className="text-sm text-gray-500">
+                {todayAttemptCount} / {dailyGoal}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${dailyProgress * 100}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className={`h-3 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500`}
+              />
+            </div>
+            {dailyProgress >= 1 && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                <Trophy className="w-4 h-4" /> Bugungi maqsad bajarildi!
+              </motion.p>
+            )}
+          </motion.div>
+        )}
+
+        {/* Activity Grid */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : (
+          Object.entries(grouped).map(([category, items]) => {
+            const meta = categoryMeta[category];
+            if (!meta || items.length === 0) return null;
+
+            return (
+              <div key={category} className="mb-10">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className={`p-2 rounded-lg bg-gradient-to-br ${meta.color} text-white`}>
+                    <meta.icon className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">{meta.label}</h2>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {items.map((activity, i) => {
+                    const am = activityMeta[activity.type];
+                    const hs = highScores[activity.id];
+
+                    return (
+                      <motion.button
+                        key={activity.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        onClick={() => setActiveActivity(activity)}
+                        className="text-left bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all btn-macos group"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${am?.gradient || "from-gray-400 to-gray-500"} flex items-center justify-center text-2xl`}>
+                            {activity.icon}
+                          </div>
+                          <div className="flex gap-1">
+                            {activity.type === "speed_vocab" && (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">🔥 Eng mashhur</span>
+                            )}
+                            {activity.type === "daily_challenge" && (
+                              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">⚡ Yangi</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
+                          {activity.title}
+                        </h3>
+
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {activity.estimatedMin} min
+                          </span>
+                          {hs !== undefined && (
+                            <span className="flex items-center gap-1 text-amber-600">
+                              <Trophy className="w-3 h-3" /> {hs.score}
+                            </span>
+                          )}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </motion.div>
     </div>
   );
 }
