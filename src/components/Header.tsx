@@ -64,9 +64,14 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex items-center justify-between h-full">
           {/* Chap — Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <BookOpen className="w-6 h-6 text-primary" />
-            <span className="text-lg font-bold text-gray-900 dark:text-white">IELTS</span>
+          <Link href="/" className="flex items-center gap-3 shrink-0 group hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-md">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+            <span className="hidden sm:block">
+              <span className="text-xl font-extrabold tracking-tight text-indigo-600">IELTS</span>
+              <span className="text-xl font-bold tracking-tight text-gray-800"> Mastery</span>
+            </span>
           </Link>
 
           {/* O'rta — Nav linklari */}
