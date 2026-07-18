@@ -8,13 +8,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Clock, BookOpen, CheckCircle2, XCircle, Trophy,
   Volume2, Plus, Loader2, ChevronRight, Layers, Sparkles,
-  Shuffle, Zap, CheckCheck, Star,
+  Shuffle, Zap, CheckCheck, Star, RefreshCw,
 } from "lucide-react";
 import VideoPlayer from "@/components/VideoPlayer";
+import { getWordIcon, getIconBg } from "@/lib/wordIcons";
 
 interface VocabWord {
   id: string; lessonId: string; word: string; meaning: string;
   translation: string; exampleSentence: string; audioUrl: string | null;
+  visualIcon: string;
 }
 
 interface Lesson {
@@ -165,7 +167,9 @@ export default function VocabularyLessonPage() {
     const selectedWords = shuffled.slice(0, count);
 
     selectedWords.forEach((w, i) => {
-      if (i % 2 === 0) {
+      const r = Math.random();
+      if (r < 0.35) {
+        // So'z - ma'no matching
         const wrongOptions = words
           .filter(x => x.id !== w.id)
           .sort(() => Math.random() - 0.5)
@@ -173,13 +177,30 @@ export default function VocabularyLessonPage() {
           .map(x => x.translation);
         const opts = [w.translation, ...wrongOptions].sort(() => Math.random() - 0.5);
         result.push({
-          id: i * 2 + 1, type: "matching",
+          id: i * 3 + 1, type: "matching",
           question: w.word,
           options: opts,
           correctIndex: opts.indexOf(w.translation),
           word: w.word,
         });
+      } else if (r < 0.65) {
+        // Emoji - so'z matching
+        const icon = w.visualIcon || getWordIcon(w.word);
+        const wrongWords = words
+          .filter(x => x.id !== w.id)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map(x => x.word);
+        const opts = [w.word, ...wrongWords].sort(() => Math.random() - 0.5);
+        result.push({
+          id: i * 3 + 2, type: "matching",
+          question: `${icon} Bu qaysi so'z?`,
+          options: opts,
+          correctIndex: opts.indexOf(w.word),
+          word: w.word,
+        });
       } else {
+        // Fill-blank
         const sentence = w.exampleSentence.replace(
           new RegExp(w.word, "i"), "______"
         );
@@ -190,7 +211,7 @@ export default function VocabularyLessonPage() {
           .map(x => x.word);
         const opts = [w.word, ...wrongWords].sort(() => Math.random() - 0.5);
         result.push({
-          id: i * 2 + 1, type: "fill-blank",
+          id: i * 3 + 3, type: "fill-blank",
           question: sentence,
           options: opts,
           correctIndex: opts.indexOf(w.word),
@@ -214,7 +235,7 @@ export default function VocabularyLessonPage() {
       const res = await fetch("/api/flashcards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: word.word, meaning: word.meaning, translation: word.translation }),
+        body: JSON.stringify({ word: word.word, meaning: word.meaning, translation: word.translation, visualIcon: word.visualIcon }),
       });
       if (res.ok) {
         setFlashcardIds(prev => new Set(prev).add(word.word.toLowerCase()));
@@ -300,6 +321,13 @@ export default function VocabularyLessonPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <style>{`
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .group:hover .preserve-3d { box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .flipped { transform: rotateY(180deg); }
+        .perspective { perspective: 1000px; }
+      `}</style>
       <Link href="/courses/vocabulary" className="inline-flex items-center text-sm text-gray-500 hover:text-primary mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4 mr-1" /> Vocabulary
       </Link>
@@ -359,43 +387,69 @@ export default function VocabularyLessonPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {words.map((w, i) => {
                 const isInFlashcards = flashcardIds.has(w.word.toLowerCase());
                 const isAdding = addingFlashcards.has(w.word.toLowerCase());
+                const icon = w.visualIcon || getWordIcon(w.word);
+                const iconBg = getIconBg(icon);
                 return (
                   <motion.div
                     key={w.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.03 }}
-                    className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-4 hover:shadow-macos transition-shadow"
+                    className="group perspective"
+                    style={{ perspective: "1000px" }}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handlePlayAudio(w.word)} className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                    <div className="relative w-full min-h-[180px] preserve-3d transition-transform duration-500 cursor-pointer"
+                      style={{ transformStyle: "preserve-3d" }}
+                      onClick={(e) => {
+                        const target = e.currentTarget;
+                        target.classList.toggle("flipped");
+                      }}
+                    >
+                      {/* Front */}
+                      <div className="absolute inset-0 backface-hidden glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-5 flex flex-col items-center justify-center"
+                        style={{ backfaceVisibility: "hidden" }}>
+                        <div className={`w-16 h-16 rounded-2xl ${iconBg} flex items-center justify-center mb-3 text-3xl shadow-sm`}>
+                          {icon}
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 capitalize mb-1">{w.word}</h3>
+                        <button onClick={(e) => { e.stopPropagation(); handlePlayAudio(w.word); }}
+                          className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors mt-1">
                           <Volume2 className="w-4 h-4 text-gray-500" />
                         </button>
-                        <h3 className="text-lg font-bold text-gray-900 capitalize">{w.word}</h3>
+                        <span className="text-[10px] text-gray-400 mt-2">Bosing</span>
                       </div>
-                      {isInFlashcards ? (
-                        <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                          <CheckCheck className="w-3 h-3" /> Qo'shilgan
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleAddToFlashcards(w)}
-                          disabled={isAdding || !session}
-                          className="flex items-center gap-1 text-xs text-primary bg-primary/5 px-2 py-1 rounded-full hover:bg-primary/10 transition-colors disabled:opacity-40"
-                        >
-                          {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                          Flashcards
-                        </button>
-                      )}
+                      {/* Back */}
+                      <div className="absolute inset-0 backface-hidden glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-5 flex flex-col"
+                        style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center text-lg`}>{icon}</div>
+                            <h3 className="text-lg font-bold text-gray-900 capitalize">{w.word}</h3>
+                          </div>
+                          {isInFlashcards ? (
+                            <span className="flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full shrink-0">
+                              <CheckCheck className="w-3 h-3" /> Qo'shilgan
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAddToFlashcards(w); }}
+                              disabled={isAdding || !session}
+                              className="flex items-center gap-1 text-[10px] text-primary bg-primary/5 px-2 py-1 rounded-full hover:bg-primary/10 transition-colors disabled:opacity-40 shrink-0"
+                            >
+                              {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                              Flashcards
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700 font-medium mb-1">{w.meaning}</p>
+                        <p className="text-sm text-gray-500 mb-2">{w.translation}</p>
+                        <p className="text-xs text-gray-400 italic leading-relaxed">&ldquo;{w.exampleSentence}&rdquo;</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-700 font-medium mb-1">{w.meaning}</p>
-                    <p className="text-sm text-gray-500 mb-2">{w.translation}</p>
-                    <p className="text-xs text-gray-400 italic leading-relaxed">&ldquo;{w.exampleSentence}&rdquo;</p>
                   </motion.div>
                 );
               })}

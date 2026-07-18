@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     const userId = (session.user as any).id;
-    const { word, meaning, translation } = await req.json();
+    const { word, meaning, translation, visualIcon } = await req.json();
 
     const existing = await prisma.flashcard.findFirst({
       where: { userId, word: word.toLowerCase() },
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         word: word.toLowerCase(),
         meaning,
         translation,
+        visualIcon: visualIcon || "📝",
       },
     });
 

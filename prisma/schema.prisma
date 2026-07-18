@@ -110,6 +110,7 @@ model Flashcard {
   word            String
   meaning         String?
   translation     String?
+  visualIcon      String   @default("📝")
   nextReviewDate  DateTime @default(now())
   repetitionLevel Int      @default(0)
   createdAt       DateTime @default(now())
@@ -273,6 +274,7 @@ model VocabularyWord {
   translation     String
   exampleSentence String
   audioUrl        String?
+  visualIcon      String   @default("📝")
 
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }

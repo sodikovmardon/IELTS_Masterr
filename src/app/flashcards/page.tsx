@@ -12,12 +12,14 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { getWordIcon, getIconBg } from "@/lib/wordIcons";
 
 interface Flashcard {
   id: string;
   word: string;
   meaning: string | null;
   translation: string | null;
+  visualIcon: string;
   nextReviewDate: string;
   repetitionLevel: number;
 }
@@ -134,6 +136,9 @@ export default function FlashcardsPage() {
           >
             <Volume2 className="w-5 h-5 text-gray-600" />
           </button>
+          <div className={`w-20 h-20 rounded-2xl ${getIconBg(current.visualIcon || getWordIcon(current.word))} flex items-center justify-center mb-4 text-4xl shadow-sm`}>
+            {current.visualIcon || getWordIcon(current.word)}
+          </div>
           <h3 className="text-3xl font-bold text-gray-900 mb-4 capitalize">
             {current.word}
           </h3>
@@ -233,6 +238,9 @@ export default function FlashcardsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg ${getIconBg(card.visualIcon || getWordIcon(card.word))} flex items-center justify-center text-lg shrink-0`}>
+                        {card.visualIcon || getWordIcon(card.word)}
+                      </div>
                       <h4 className="font-semibold text-gray-900 capitalize">
                         {card.word}
                       </h4>
