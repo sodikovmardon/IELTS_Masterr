@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { SmartContent, InfoBox, ContentCard, SectionHeading } from "@/components/lesson";
 import VideoPlayer from "@/components/VideoPlayer";
+import { FormulaBlock, ErrorCorrection } from "@/components/visuals/FormulaBlock";
 
 interface LessonProgress {
   completed: boolean; score: number | null; maxScore: number | null;
@@ -47,6 +48,42 @@ const TYPE_LABELS: Record<string, string> = {
   "error-correction": "Xatoni tuzatish",
   "transformation": "Gapni o'zgartirish",
 };
+
+function renderTheoryWithFormulas(text: string) {
+  if (!text) return null;
+  const formulaPattern = /^([A-Z][a-z]*\s*[+]\s*[A-Z].*|.*→.*|.*⇒.*|.*[+]\s*V[123].*|.*[+]\s*[Nn]oun.*|.*[+]\s*[Aa]djective.*|.*have\/has\s*\+.*|.*had\s*\+.*|.*will\s*\+.*|.*be\s*\+.*|.*been\s*\+.*|.*being\s*\+.*|^S\s*\+|^Subject\s*\+)/gm;
+  const parts: React.ReactNode[] = [];
+  const lines = text.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+    if (formulaPattern.test(line)) {
+      // Collect consecutive formula lines
+      let formulaLines = [line];
+      i++;
+      while (i < lines.length) {
+        const next = lines[i].trim();
+        if (next && formulaPattern.test(next)) {
+          formulaLines.push(next);
+          i++;
+        } else break;
+      }
+      parts.push(<FormulaBlock key={i} formula={formulaLines.join('\n')} label="GRAMMAR FORMULA" />);
+    } else {
+      let textLines = [line];
+      i++;
+      while (i < lines.length) {
+        const next = lines[i].trim();
+        if (next && formulaPattern.test(next)) break;
+        textLines.push(lines[i]);
+        i++;
+      }
+      parts.push(<SmartContent key={i} text={textLines.join('\n')} />);
+    }
+  }
+  return <div className="space-y-3">{parts}</div>;
+}
 
 export default function GrammarLessonPage() {
   const params = useParams();
@@ -233,7 +270,19 @@ export default function GrammarLessonPage() {
   const diff = DIFFICULTY_CONFIG[lesson.difficulty] || { label: lesson.difficulty, class: "bg-gray-100 text-gray-700" };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen" style={{ backgroundColor: "#0A1628" }}>
+      {/* Blueprint grid background */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.05]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)
+          `,
+          backgroundSize: "40px 40px",
+        }}
+      />
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative">
       <div className="flex items-center justify-between mb-6">
         <Link href="/courses/grammar" className="inline-flex items-center text-sm text-gray-500 hover:text-primary transition-colors">
           <ArrowLeft className="w-4 h-4 mr-1" /> Grammar kursi
@@ -300,7 +349,7 @@ export default function GrammarLessonPage() {
                   title={lesson.title}
                 />
               )}
-              <SmartContent text={lesson.theoryContent} />
+              {renderTheoryWithFormulas(lesson.theoryContent)}
             </ContentCard>
 
             {lesson.tipsAndTricks && (
@@ -547,6 +596,7 @@ export default function GrammarLessonPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
