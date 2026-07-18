@@ -28,28 +28,40 @@ const staggerContainer = {
 
 const offers = [
   {
-    icon: <BookOpen className="w-8 h-8" />,
+    icon: <BookOpen className="w-7 h-7" />,
     title: "Interaktiv Reading Materiallari",
     desc: "IELTS reading passage'lari asosida tuzilgan matnlar va savollar",
     color: "bg-indigo-100 text-indigo-600",
+    border: "border-indigo-500",
+    bg: "from-indigo-50 to-white",
+    href: "/courses/reading",
   },
   {
-    icon: <Brain className="w-8 h-8" />,
+    icon: <Brain className="w-7 h-7" />,
     title: "Smart Dictionary",
     desc: "Matn ichidagi so'zlarni bosish bilan ma'nosini ko'ring va flashcardsga qo'shing",
     color: "bg-emerald-100 text-emerald-600",
+    border: "border-emerald-500",
+    bg: "from-emerald-50 to-white",
+    href: "/courses/reading",
   },
   {
-    icon: <Target className="w-8 h-8" />,
+    icon: <Target className="w-7 h-7" />,
     title: "Shaxsiy Dars Rejasi",
     desc: "Darajangiz va maqsadingizga mos avtomatik yaratilgan o'quv jadvali",
     color: "bg-amber-100 text-amber-600",
+    border: "border-amber-500",
+    bg: "from-amber-50 to-white",
+    href: "/study-plan",
   },
   {
-    icon: <BarChart3 className="w-8 h-8" />,
+    icon: <BarChart3 className="w-7 h-7" />,
     title: "Tahliliy Natijalar",
     desc: "Batafsil progress grafiklari va statistikalar",
     color: "bg-rose-100 text-rose-600",
+    border: "border-rose-500",
+    bg: "from-rose-50 to-white",
+    href: "/dashboard",
   },
 ];
 
@@ -223,30 +235,42 @@ export default function HomePage() {
         <motion.div
           initial="initial"
           whileInView="animate"
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-50px" }}
           variants={staggerContainer}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
-          {offers.map((offer, i) => (
-            <motion.div
-              key={i}
-              variants={fadeInUp}
-              whileHover={{ y: -4 }}
-              className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos hover:shadow-macos transition-all duration-300 border border-white/20 cursor-default card-hover"
-            >
-              <motion.div
-                whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }}
-                transition={{ duration: 0.4 }}
-                className={`w-14 h-14 rounded-lg flex items-center justify-center mb-4 ${offer.color}`}
-              >
-                {offer.icon}
+          <motion.div variants={fadeInUp} className="text-center mb-10">
+            <span className="text-xs font-semibold text-indigo-600 uppercase tracking-widest">Platforma imkoniyatlari</span>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+              IELTS ga tayyorlanishning eng oson usuli
+            </h2>
+            <p className="text-gray-500 mt-2 max-w-xl mx-auto">
+              Barcha kerakli vositalar bir joyda — o'qing, tinglang, yozing va gapiring
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+            {offers.map((offer, i) => (
+              <motion.div key={i} variants={fadeInUp}>
+                <Link
+                  href={offer.href}
+                  className={`group block bg-gradient-to-b ${offer.bg} rounded-2xl border-t-4 ${offer.border} border-x border-b border-gray-100 p-8 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}
+                >
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${offer.color}`}>
+                    {offer.icon}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    {offer.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                    {offer.desc}
+                  </p>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-indigo-600 transition-colors">
+                    Batafsil
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                  </span>
+                </Link>
               </motion.div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                {offer.title}
-              </h3>
-              <p className="text-sm text-gray-600">{offer.desc}</p>
-            </motion.div>
-          ))}
+            ))}
+          </div>
         </motion.div>
       </section>
 
