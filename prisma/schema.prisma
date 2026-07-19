@@ -130,6 +130,8 @@ model Flashcard {
   meaning         String?
   translation     String?
   visualIcon      String   @default("📝")
+  category        String?  // "Environment", "Technology", "Academic", "General", etc.
+  masteryStatus   String   @default("new") // "new" | "learning" | "mastered"
   nextReviewDate  DateTime @default(now())
   repetitionLevel Int      @default(0)
   createdAt       DateTime @default(now())

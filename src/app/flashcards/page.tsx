@@ -1,18 +1,17 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  RefreshCw,
-  Trash2,
-  Layers,
-  Volume2,
-  CheckCircle,
-  XCircle,
+  RefreshCw, Trash2, Layers, Volume2,
+  GraduationCap, Zap, Pencil, List,
+  BookOpen, Trophy,
 } from "lucide-react";
 import { getWordIcon, getIconBg } from "@/lib/wordIcons";
+import MiniCalendar from "@/components/flashcards/MiniCalendar";
+import FlashcardFilter from "@/components/flashcards/FlashcardFilter";
+import SessionManager from "@/components/flashcards/SessionManager";
 
 interface Flashcard {
   id: string;
@@ -20,58 +19,73 @@ interface Flashcard {
   meaning: string | null;
   translation: string | null;
   visualIcon: string;
+  category?: string | null;
+  masteryStatus: string;
   nextReviewDate: string;
   repetitionLevel: number;
 }
+
+const categoryColors: Record<string, string> = {
+  Environment: "from-green-400 to-emerald-500",
+  Technology: "from-blue-400 to-indigo-500",
+  Academic: "from-purple-400 to-violet-500",
+  General: "from-amber-400 to-orange-500",
+  Vocabulary: "from-pink-400 to-rose-500",
+};
+
+const modalVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1 },
+};
 
 export default function FlashcardsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showMeaning, setShowMeaning] = useState(false);
-  const [mode, setMode] = useState<"list" | "review">("list");
+  const [stats, setStats] = useState({ dueCount: 0, totalCount: 0, masteredCount: 0, learningCount: 0, calendarData: {} as Record<string, number> });
+  const [categories, setCategories] = useState<{ name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [search, setSearch] = useState("");
+  const [sessionMode, setSessionMode] = useState<"review" | "quiz" | "writing" | "speed" | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-      return;
-    }
+    if (status === "unauthenticated") { router.push("/login"); return; }
     if (status !== "authenticated") return;
-
-    fetch("/api/flashcards")
-      .then((r) => r.json())
-      .then((data) => {
-        setFlashcards(data.flashcards);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetchData();
   }, [status, router]);
 
-  const handleReview = async (correct: boolean) => {
-    const flashcard = flashcards[currentIndex];
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      await fetch("/api/flashcards", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: flashcard.id, correct }),
-      });
-
-      const updated = await fetch("/api/flashcards").then((r) => r.json());
-      setFlashcards(updated.flashcards);
-    } catch (e) {
-      console.error(e);
-    }
-    setShowMeaning(false);
-
-    if (currentIndex < flashcards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      setMode("list");
-      setCurrentIndex(0);
-    }
+      const res = await fetch("/api/flashcards");
+      const data = await res.json();
+      setFlashcards(data.flashcards || []);
+      setStats(data.stats || { dueCount: 0, totalCount: 0, masteredCount: 0, learningCount: 0, calendarData: {} });
+      setCategories(data.categories || []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
   };
+
+  const filteredCards = useMemo(() => {
+    let cards = [...flashcards];
+    if (activeCategory !== "all") cards = cards.filter((c) => c.category === activeCategory);
+    if (activeTab === "due") cards = cards.filter((c) => new Date(c.nextReviewDate) <= new Date());
+    else if (activeTab === "new") cards = cards.filter((c) => c.masteryStatus === "new");
+    else if (activeTab === "learning") cards = cards.filter((c) => c.masteryStatus === "learning");
+    else if (activeTab === "mastered") cards = cards.filter((c) => c.masteryStatus === "mastered");
+    if (search) cards = cards.filter((c) => c.word.toLowerCase().includes(search.toLowerCase()));
+    return cards;
+  }, [flashcards, activeCategory, activeTab, search]);
+
+  const tabs = [
+    { key: "all", label: "Barchasi", count: stats.totalCount },
+    { key: "due", label: "Takrorlash kerak", count: stats.dueCount },
+    { key: "new", label: "Yangi", count: stats.totalCount - stats.learningCount - stats.masteredCount },
+    { key: "learning", label: "O'rganilmoqda", count: stats.learningCount },
+    { key: "mastered", label: "O'zlashtirilgan", count: stats.masteredCount },
+  ];
 
   const handleDelete = async (id: string) => {
     try {
@@ -80,10 +94,9 @@ export default function FlashcardsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      setFlashcards(flashcards.filter((f) => f.id !== id));
-    } catch (e) {
-      console.error(e);
-    }
+      setFlashcards((prev) => prev.filter((f) => f.id !== id));
+      fetchData();
+    } catch (e) { console.error(e); }
   };
 
   const handlePlayAudio = (word: string) => {
@@ -100,191 +113,257 @@ export default function FlashcardsPage() {
     );
   }
 
-  const dueFlashcards = flashcards.filter(
-    (f) => new Date(f.nextReviewDate) <= new Date()
-  );
+  // Session mode
+  if (sessionMode) {
+    const sessionCards = sessionMode === "review"
+      ? flashcards.filter((f) => new Date(f.nextReviewDate) <= new Date())
+      : sessionMode === "speed"
+      ? flashcards.sort(() => Math.random() - 0.5).slice(0, 20)
+      : filteredCards;
 
-  if (mode === "review" && flashcards.length > 0) {
-    const current = flashcards[currentIndex];
-
-    if (!current) {
-      setMode("list");
-      return null;
+    if (sessionCards.length === 0) {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-8 text-center">
+          <p className="text-gray-500 mb-4">Hech qanday karta topilmadi</p>
+          <button onClick={() => setSessionMode(null)} className="text-primary hover:underline">Orqaga</button>
+        </div>
+      );
     }
 
     return (
-      <div className="max-w-lg mx-auto px-4 py-12">
-        <div className="text-center mb-6">
-          <Layers className="w-10 h-10 text-primary mx-auto mb-2" />
-          <h2 className="text-xl font-bold text-gray-900">
-            Flashcard Review
-          </h2>
-          <p className="text-sm text-gray-500">
-            {currentIndex + 1} / {flashcards.length}
-          </p>
-        </div>
-
-        <motion.div
-          key={current.id}
-          initial={{ opacity: 0, rotateY: -10 }}
-          animate={{ opacity: 1, rotateY: 0 }}
-          className="glass-card bg-white/90 backdrop-blur-sm rounded-3xl shadow-macos border border-white/20 p-8 text-center min-h-[250px] flex flex-col items-center justify-center"
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <button
+          onClick={() => setSessionMode(null)}
+          className="text-sm text-gray-500 hover:text-gray-700 mb-4 inline-block"
         >
-          <button
-            onClick={() => handlePlayAudio(current.word)}
-            className="p-2 bg-gray-100 rounded-full mb-4 hover:bg-gray-200 transition-colors"
-          >
-            <Volume2 className="w-5 h-5 text-gray-600" />
-          </button>
-          <div className={`w-20 h-20 rounded-2xl ${getIconBg(current.visualIcon || getWordIcon(current.word))} flex items-center justify-center mb-4 text-4xl shadow-sm`}>
-            {current.visualIcon || getWordIcon(current.word)}
-          </div>
-          <h3 className="text-3xl font-bold text-gray-900 mb-4 capitalize">
-            {current.word}
-          </h3>
-
-          {!showMeaning ? (
-            <button
-              onClick={() => setShowMeaning(true)}
-              className="bg-gray-100 text-gray-600 px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-            >
-              Ma'nosini ko'rish
-            </button>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full"
-            >
-              <p className="text-gray-700 mb-2">{current.meaning}</p>
-              {current.translation && (
-                <p className="text-gray-500 text-sm mb-4">
-                  {current.translation}
-                </p>
-              )}
-              <div className="flex gap-3 justify-center mt-6">
-                <button
-                  onClick={() => handleReview(false)}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Esimda yo'q
-                </button>
-                <button
-                  onClick={() => handleReview(true)}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 text-accent-mint rounded-lg font-medium hover:bg-emerald-100 transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Bilaman
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </motion.div>
+          ← Flashcardlar
+        </button>
+        <SessionManager
+          cards={sessionCards}
+          mode={sessionMode}
+          onBack={() => { setSessionMode(null); fetchData(); }}
+          onRefresh={fetchData}
+        />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="flex items-center justify-between mb-8">
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">
-              Flashcards
-            </h1>
-            <p className="text-gray-600">
-              {flashcards.length} ta so'z | {dueFlashcards.length} ta takrorlash
-              kerak
+            <h1 className="text-3xl font-bold text-gray-900">Flashcards</h1>
+            <p className="text-gray-500 mt-1">
+              {stats.totalCount} ta so'z · {stats.masteredCount} ta o'zlashtirilgan
             </p>
           </div>
-          <button
-            onClick={() => {
-              setCurrentIndex(0);
-              setShowMeaning(false);
-              setMode("review");
-            }}
-            disabled={flashcards.length === 0}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 btn-macos"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Takrorlash
-          </button>
         </div>
 
-        {flashcards.length === 0 ? (
-          <div className="text-center py-16 glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20">
-            <Layers className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Hali flashcards yo'q
-            </h3>
-            <p className="text-gray-600">
-              Practice paytida so'zlarni bosib flashcardsga qo'shing
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {flashcards.map((card, i) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.02 }}
-                className="glass-card bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-4 hover:shadow-macos transition-shadow"
+        {/* Stats row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Jami", value: stats.totalCount, icon: Layers, color: "text-indigo-500 bg-indigo-50" },
+            { label: "Takrorlash kerak", value: stats.dueCount, icon: RefreshCw, color: "text-red-500 bg-red-50" },
+            { label: "O'rganilmoqda", value: stats.learningCount, icon: BookOpen, color: "text-amber-500 bg-amber-50" },
+            { label: "O'zlashtirilgan", value: stats.masteredCount, icon: Trophy, color: "text-green-500 bg-green-50" },
+          ].map((s) => (
+            <motion.div
+              key={s.label}
+              className="bg-white/90 backdrop-blur-sm rounded-xl shadow-macos border border-white/20 p-4"
+            >
+              <div className={`w-8 h-8 rounded-lg ${s.color} flex items-center justify-center mb-2`}>
+                <s.icon className="w-4 h-4" />
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{s.value}</div>
+              <div className="text-xs text-gray-500">{s.label}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left: Calendar widget */}
+          <div>
+            <MiniCalendar calendarData={stats.calendarData} dueCount={stats.dueCount} />
+
+            {/* Mode buttons */}
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={() => setSessionMode("review")}
+                disabled={stats.dueCount === 0}
+                className="w-full flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-xl shadow-macos border border-white/20 p-4 hover:shadow-lg transition-all disabled:opacity-50 btn-macos"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg ${getIconBg(card.visualIcon || getWordIcon(card.word))} flex items-center justify-center text-lg shrink-0`}>
-                        {card.visualIcon || getWordIcon(card.word)}
-                      </div>
-                      <h4 className="font-semibold text-gray-900 capitalize">
-                        {card.word}
-                      </h4>
-                      <button
-                        onClick={() => handlePlayAudio(card.word)}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        <Volume2 className="w-3 h-3 text-gray-400" />
-                      </button>
-                    </div>
-                    {card.meaning && (
-                      <p className="text-xs text-gray-600 mt-1 line-clamp-1">
-                        {card.meaning}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <div
-                            key={j}
-                            className={`w-2 h-2 rounded-full ${
-                              j < card.repetitionLevel
-                                ? "bg-accent-mint"
-                                : "bg-gray-200"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        Lv.{card.repetitionLevel}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(card.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
+                  <RefreshCw className="w-5 h-5" />
                 </div>
-              </motion.div>
-            ))}
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">Takrorlash</div>
+                  <div className="text-xs text-gray-500">{stats.dueCount} ta karta</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSessionMode("quiz")}
+                className="w-full flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-xl shadow-macos border border-white/20 p-4 hover:shadow-lg transition-all btn-macos"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">Quiz rejimi</div>
+                  <div className="text-xs text-gray-500">{filteredCards.length} ta variantli test</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSessionMode("writing")}
+                className="w-full flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-xl shadow-macos border border-white/20 p-4 hover:shadow-lg transition-all btn-macos"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">Yozish rejimi</div>
+                  <div className="text-xs text-gray-500">Spelling mashqi</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSessionMode("speed")}
+                className="w-full flex items-center gap-3 bg-white/90 backdrop-blur-sm rounded-xl shadow-macos border border-white/20 p-4 hover:shadow-lg transition-all btn-macos"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-400 to-pink-500 flex items-center justify-center text-white">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-900 text-sm">Tezkor rejim</div>
+                  <div className="text-xs text-gray-500">60 soniyada maksimal ball</div>
+                </div>
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* Right: Flashcard list */}
+          <div className="lg:col-span-2">
+            <FlashcardFilter
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              categories={categories}
+              activeCategory={activeCategory}
+              onCategoryChange={setActiveCategory}
+              search={search}
+              onSearchChange={setSearch}
+            />
+
+            <AnimatePresence mode="wait">
+              {filteredCards.length === 0 ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-16 bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20"
+                >
+                  <Layers className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Hech narsa topilmadi</h3>
+                  <p className="text-gray-600 text-sm">
+                    {search ? "Boshqa so'z qidirib ko'ring" : "Hozircha flashcards yo'q"}
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                  {filteredCards.map((card, i) => {
+                    const dueToday = new Date(card.nextReviewDate) <= new Date();
+                    const dueTomorrow = !dueToday && new Date(card.nextReviewDate) <= new Date(Date.now() + 86400000);
+                    const bgGrad = categoryColors[card.category || "General"] || categoryColors.General;
+
+                    return (
+                      <motion.div
+                        key={card.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.02 }}
+                        className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-macos border border-white/20 p-4 hover:shadow-lg transition-all"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Category color bar */}
+                          <div className={`w-1.5 h-full min-h-[60px] rounded-full bg-gradient-to-b ${bgGrad} shrink-0 mt-1`} />
+
+                          <div className={`w-10 h-10 rounded-xl ${getIconBg(card.visualIcon || getWordIcon(card.word))} flex items-center justify-center text-xl shrink-0`}>
+                            {card.visualIcon || getWordIcon(card.word)}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-gray-900 capitalize">{card.word}</h4>
+                              <button
+                                onClick={() => handlePlayAudio(card.word)}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              >
+                                <Volume2 className="w-3 h-3 text-gray-400" />
+                              </button>
+                            </div>
+                            {card.meaning && (
+                              <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{card.meaning}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <div className="flex gap-0.5">
+                                {Array.from({ length: 7 }).map((_, j) => (
+                                  <div key={j} className={`w-1.5 h-1.5 rounded-full ${j < card.repetitionLevel ? "bg-accent-mint" : "bg-gray-200"}`} />
+                                ))}
+                              </div>
+
+                              {/* Review date badge */}
+                              {dueToday ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium">
+                                  Bugun!
+                                </span>
+                              ) : dueTomorrow ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-600 font-medium">
+                                  Ertaga
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(card.nextReviewDate).toLocaleDateString("uz")}
+                                </span>
+                              )}
+
+                              {/* Mastery status badge */}
+                              {card.masteryStatus === "mastered" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-600 font-medium">
+                                  ✅ O'zlashtirilgan
+                                </span>
+                              )}
+                              {card.masteryStatus === "learning" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-600 font-medium">
+                                  📖 O'rganilmoqda
+                                </span>
+                              )}
+
+                              {card.category && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                  {card.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDelete(card.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
