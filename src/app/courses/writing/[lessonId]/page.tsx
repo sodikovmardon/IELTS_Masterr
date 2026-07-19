@@ -53,13 +53,14 @@ interface Lesson {
 }
 
 interface EvaluationResult {
-  taskAchievement: { score: number; feedback: string };
-  coherenceCohesion: { score: number; feedback: string };
-  lexicalResource: { score: number; feedback: string };
-  grammaticalRange: { score: number; feedback: string };
+  taskAchievement: { score: number; feedback: string; strengths: string[]; improvements: string[] };
+  coherenceCohesion: { score: number; feedback: string; strengths: string[]; improvements: string[] };
+  lexicalResource: { score: number; feedback: string; strengths: string[]; improvements: string[] };
+  grammaticalRange: { score: number; feedback: string; strengths: string[]; improvements: string[] };
   overallBand: number;
   generalFeedback: string;
   wordCount: number;
+  estimatedBand: string;
 }
 
 interface TabDef {
@@ -462,7 +463,24 @@ export default function WritingLessonPage() {
           });
           await fetch("/api/writing-history", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lessonId: lesson!.id, essayText, wordCount: data.wordCount, ...data }),
+            body: JSON.stringify({
+              lessonId: lesson!.id,
+              essayText,
+              wordCount: data.wordCount,
+              taskAchievement: data.taskAchievement.score,
+              coherenceCohesion: data.coherenceCohesion.score,
+              lexicalResource: data.lexicalResource.score,
+              grammaticalRange: data.grammaticalRange.score,
+              overallBand: data.overallBand,
+              feedback: JSON.stringify({
+                taskAchievement: data.taskAchievement,
+                coherenceCohesion: data.coherenceCohesion,
+                lexicalResource: data.lexicalResource,
+                grammaticalRange: data.grammaticalRange,
+                generalFeedback: data.generalFeedback,
+                estimatedBand: data.estimatedBand,
+              }),
+            }),
           });
         } catch {}
       }
@@ -1104,7 +1122,8 @@ export default function WritingLessonPage() {
             <div className="text-5xl font-extrabold text-primary mb-1">
               {evaluation.overallBand.toFixed(1)}
             </div>
-            <p className="text-gray-500 text-sm">Umumiy ball &middot; {evaluation.wordCount} so'z</p>
+            <p className="text-sm text-gray-500 mb-1">{evaluation.estimatedBand}</p>
+            <p className="text-gray-500 text-sm">&middot; {evaluation.wordCount} so'z &middot;</p>
             <div className="w-full max-w-xs mx-auto mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
@@ -1135,7 +1154,31 @@ export default function WritingLessonPage() {
                       <span className="text-sm font-medium text-gray-700">{label}</span>
                       <span className="text-lg font-bold text-primary">{data.score.toFixed(1)}</span>
                     </div>
-                    <p className="text-xs text-gray-500 leading-relaxed">{data.feedback}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-2">{data.feedback}</p>
+                    {data.strengths.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-semibold text-green-600 uppercase mb-1">✅ Kuchli tomonlar</p>
+                        <ul className="space-y-0.5">
+                          {data.strengths.map((s, i) => (
+                            <li key={i} className="text-[10px] text-green-700 flex items-start gap-1">
+                              <span>•</span> {s}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {data.improvements.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase mb-1">⚡ Yaxshilanish kerak</p>
+                        <ul className="space-y-0.5">
+                          {data.improvements.map((s, i) => (
+                            <li key={i} className="text-[10px] text-amber-700 flex items-start gap-1">
+                              <span>•</span> {s}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1147,7 +1190,7 @@ export default function WritingLessonPage() {
               <Trophy className="w-5 h-5 text-indigo-600" />
               <h3 className="font-semibold text-indigo-800">Umumiy fikr</h3>
             </div>
-            <p className="text-gray-700 text-sm leading-relaxed">{evaluation.generalFeedback}</p>
+            <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{evaluation.generalFeedback}</div>
           </ContentCard>
 
           {modelAnswer && (
